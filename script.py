@@ -6,6 +6,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from pmdarima import auto_arima as AA
 import warnings
 import os
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 # suppress harmless deprecation warnings
 warnings.filterwarnings("ignore")
@@ -14,6 +15,10 @@ warnings.filterwarnings("ignore")
 system_forecasts = pd.read_csv('datasets/systems_copied.csv', parse_dates=True, index_col=0)
 print(system_forecasts.head())
 print(system_forecasts.columns)
+
+transposed = system_forecasts.transpose()
+print(transposed)
+print(transposed.index.dtype)
 
 # pipelining dataset- transforming for analysis
 dimensions=system_forecasts.shape   # dimensiom of dataframe: 10 rows x 13 columns
@@ -57,24 +62,70 @@ def get_ETS_visuals():
         plt.savefig(os.path.join(my_path, my_file))
         plt.clf()
     
-#get_ETS_visuals()
+get_ETS_visuals()
 
 
-# call AA to identify optional params and return fitted model
-stepwise_fit1 = AA(transformed_system_forecasts[indices[0]], start_p=1, start_q=1,
-                  max_p=3, max_q=3, m=12,
-                  start_P=0, seasonal=True,
-                  d=None, D=1, trace=True,
-                  error_action='ignore',
-                  suppress_warnings=True,
-                  stepwise=True)
-
-print(stepwise_fit1.summary())
+#print(stepwise_fit.summary())
 #print(stepwise_fit1.df_model())
-print(stepwise_fit1.get_params())
+#print(stepwise_fit.get_params())
+
+print(indices)
 
 # splits data into training and test datasets, and outputs forecast values
 def train_test_predict():
+    for i in range(len(indices)):
+
+        print(f'-------------------Now analyzing {indices[i]} -------------------')
+        # call AA to identify optional params and return fitted model
+        stepwise_fit = AA(transformed_system_forecasts[indices[i]], start_p=1, start_q=1,
+                          max_p=3, max_q=3, m=12,
+                          start_P=0, seasonal=True,
+                          d=None, D=1, trace=True,
+                          error_action='ignore',
+                          suppress_warnings=True,
+                          stepwise=True)
+
+        # splitting training and testing datasets (1 full year for testing)
+        # train = transformed_system_forecasts[indices[i]].iloc[:len(transformed_system_forecasts)-12]
+        # test = transformed_system_forecasts[indices[i]].iloc[len(transformed_system_forecasts)-12:,i]
+        train = transformed_system_forecasts.iloc[[0,12],[i,i]]  # selecting all but first 12 elements from ith column (time reversed)
+        #test = transformed_system_forecasts.iloc[len(12:0:,i]
+        #print(transformed_system_forecasts[indices[i]])
+        print(train)
+        #print(train[::-1])
+        #print(test[::-1])
+        #print(train.iloc[:,0].values)
+        #try:
+
+        model = SARIMAX(train,
+                        order = stepwise_fit.get_params()['order'],
+                        seasonal_order = stepwise_fit.get_params()['seasonal_order'])
+
+        result = model.fit()
+        result.summary()
+'''
+        start = len(train)
+        end = len(train) + len(test) - 1
+
+        # Predictions for one-year against the test set
+        predictions = result.predict(start, end, typ='levels').rename("Predictions")
+
+        # graphing actual vs predicted values
+        predictions.plot(legend=True)
+        test[indices[i]].plot(legend=True)
+        plt.show()
+'''
+        #except:
+        #    print(f'Analysis for {indices[i]} failed.. skipping')
+
+
+
+#print(train_test_predict())
+
+#print(transformed_system_forecasts[indices[0 ]].\
+#      iloc[:len(transformed_system_forecasts)-12])
+#print(transformed_system_forecasts[indices[0 ]].\
+#      iloc[len(transformed_system_forecasts)-12:])
 
 '''
 stepwise_fit2 = AA(transformed_system_forecasts[indices[0]], seasonal=True,
@@ -87,5 +138,5 @@ print(stepwise_fit2.summary())
 '''
 
 # splitting data into training and testing sets
-train = transformed_system_forecasts
+
 #SARIMAX(1, 0, 0)x(0, 1, 0, 12)
